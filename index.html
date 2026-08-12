@@ -442,12 +442,12 @@
       </div>
 
       <div class="lb-block">
-        <div class="lb-head"><span>♠ Blackjack</span><button class="lb-add" data-game="blackjack" type="button">+ Score</button></div>
+        <div class="lb-head"><span>♠ Blackjack</span><button class="lb-refresh" id="btn-refresh-blackjack" type="button">🔄</button></div>
         <div class="lb-list" id="lb-blackjack"></div>
       </div>
     </div>
 
-    <footer>Ascension : classement en direct. Blackjack : scores notés à la main, gardés sur cet appareil.</footer>
+    <footer>Classements en direct, tirés du même compte que dans les jeux.</footer>
   </div>
 </div>
 
@@ -455,20 +455,6 @@
   <div class="row">
     <button class="tab-btn active" id="tab-jeux" type="button"><span class="ic">🎮</span>Jeux</button>
     <button class="tab-btn" id="tab-amis" type="button"><span class="ic">🏆</span>Amis</button>
-  </div>
-</div>
-
-<div id="modal-overlay">
-  <div class="sheet" id="sheet-score">
-    <h3 id="score-title">Ajouter un score</h3>
-    <div class="field-label">Qui a joué ?</div>
-    <select id="score-who"></select>
-    <div class="field-label">Score</div>
-    <input type="number" id="score-value" inputmode="numeric" placeholder="Ex. 1240">
-    <div class="sheet-actions">
-      <button type="button" id="score-cancel">Annuler</button>
-      <button type="button" class="primary" id="score-confirm">Enregistrer</button>
-    </div>
   </div>
 </div>
 
@@ -539,7 +525,6 @@
   // ---------- Données cosmétiques locales (avatars + scores Blackjack, propres à cet appareil) ----------
   const AVATARS = ['🙂','😎','🦊','🐼','🐸','🐧','🦄','🐙','👾','🎲','🃏','🔥','🍀','⚡','🌙','💎'];
   const AV_KEY = 'mon-arcade-avatars';
-  const BJ_KEY = 'mon-arcade-bj-scores';
 
   function loadJSON(key, fallback){
     try{ const raw = localStorage.getItem(key); if(raw) return JSON.parse(raw); }catch(e){}
@@ -548,7 +533,6 @@
   function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
 
   const avatarMap = loadJSON(AV_KEY, {});          // { uid: emoji }
-  let bjScores = loadJSON(BJ_KEY, []);              // [{id, uid, name, score}]
 
   function avatarFor(uid){
     if(!avatarMap[uid]){
@@ -560,7 +544,6 @@
   function escapeHtml(str){
     return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
   // ---------- Compte partagé (Firebase Auth + Firestore, même projet que les jeux) ----------
   let fbDb = null, fbAuth = null, fbReady = false, currentUser = null;
@@ -583,7 +566,7 @@
         currentUser = user;
         updateAuthUI();
         if(user){
-          ensureUserDoc().then(()=>{ renderFriends(); fetchAscensionLeaderboard(); renderBlackjackLeaderboard(); });
+          ensureUserDoc().then(()=>{ renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); });
         } else {
           myFriendCode = ''; myFriends = [];
         }
@@ -600,7 +583,7 @@
       meAvatarEl.textContent = avatarFor(currentUser.uid);
       buildAvatarPicker(meAvatarPicker, avatarFor(currentUser.uid), (av)=>{
         avatarMap[currentUser.uid] = av; saveJSON(AV_KEY, avatarMap);
-        meAvatarEl.textContent = av; fetchAscensionLeaderboard(); renderBlackjackLeaderboard();
+        meAvatarEl.textContent = av; fetchAscensionLeaderboard(); fetchBlackjackLeaderboard();
       });
     } else {
       authCard.classList.remove('hidden');
@@ -664,7 +647,7 @@
         fbDb.collection('users').doc(targetUid).update({ friends: firebase.firestore.FieldValue.arrayUnion(theirEntry) })
       ]).then(()=>{
         myFriends.push(myEntry);
-        renderFriends(); fetchAscensionLeaderboard(); renderBlackjackLeaderboard();
+        renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard();
       }).catch(err=>{ console.warn('Ajout ami impossible', err); alert("❌ Impossible d'ajouter cet ami"); });
     }).catch(err=>{ console.warn('Recherche ami impossible', err); alert('❌ Erreur de recherche'); });
   }
@@ -676,7 +659,7 @@
     fbDb.collection('users').doc(currentUser.uid).update({ friends: firebase.firestore.FieldValue.arrayRemove(entry) })
       .then(()=>{
         myFriends = myFriends.filter(f=>f.uid!==fuid);
-        renderFriends(); fetchAscensionLeaderboard(); renderBlackjackLeaderboard();
+        renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard();
       }).catch(err=>{ console.warn('Suppression ami impossible', err); alert('❌ Impossible de retirer cet ami'); });
   }
 
@@ -736,20 +719,35 @@
   }
   document.getElementById('btn-refresh-ascension').addEventListener('click', fetchAscensionLeaderboard);
 
-  // ---------- Scores Blackjack (notés à la main, gardés sur cet appareil) ----------
-  function renderBlackjackLeaderboard(){
+  // ---------- Classement Blackjack (en direct, tiré de la banque sauvegardée par le jeu) ----------
+  function fetchBlackjackLeaderboard(){
     const listEl = document.getElementById('lb-blackjack');
-    if(!currentUser){ listEl.innerHTML = ''; return; }
-    const knownUids = new Set([currentUser.uid, ...myFriends.map(f=>f.uid)]);
-    const rows = bjScores.filter(s=> knownUids.has(s.uid)).map(s=>({ who:s.uid, name:s.name, score:s.score, id:s.id }));
-    renderLeaderboardRows(listEl, rows, 'Aucun score noté pour le moment', (id)=>{
-      bjScores = bjScores.filter(s=>s.id!==id);
-      saveJSON(BJ_KEY, bjScores);
-      renderBlackjackLeaderboard();
-    });
+    if(!fbReady || !currentUser) return;
+    listEl.innerHTML = '<div class="empty-hint">Chargement…</div>';
+    const uids = [currentUser.uid, ...myFriends.map(f=>f.uid)];
+    const chunks = [];
+    for(let i=0;i<uids.length;i+=10) chunks.push(uids.slice(i,i+10));
+    Promise.all(chunks.map(chunk=> fbDb.collection('users').where(firebase.firestore.FieldPath.documentId(),'in',chunk).get()))
+      .then(snaps=>{
+        const rows = [];
+        snaps.forEach(snap=> snap.forEach(doc=>{
+          const d = doc.data();
+          const hasBank = d.blackjack && typeof d.blackjack.bank === 'number';
+          if(!hasBank) return;
+          const friend = myFriends.find(f=>f.uid===doc.id);
+          const name = doc.id === currentUser.uid ? (currentUser.displayName || d.pseudo || 'Joueur') : (friend ? friend.name : (d.pseudo || 'Joueur'));
+          rows.push({ who: doc.id, name, score: d.blackjack.bank });
+        }));
+        renderLeaderboardRows(listEl, rows, "Personne n'a encore joué au Blackjack — lancez une partie !", null, '🪙');
+      })
+      .catch(err=>{
+        console.warn('Classement Blackjack indisponible', err);
+        listEl.innerHTML = '<div class="empty-hint">Classement indisponible pour le moment.</div>';
+      });
   }
+  document.getElementById('btn-refresh-blackjack').addEventListener('click', fetchBlackjackLeaderboard);
 
-  function renderLeaderboardRows(listEl, rows, emptyMsg, onRemove){
+  function renderLeaderboardRows(listEl, rows, emptyMsg, onRemove, suffix){
     rows = rows.slice().sort((a,b)=>b.score-a.score);
     listEl.innerHTML = '';
     if(rows.length === 0){
@@ -767,43 +765,13 @@
         <span class="rank">${medal}</span>
         <span class="fav">${avatarFor(r.who)}</span>
         <span class="who">${escapeHtml(r.name)}${r.who===(currentUser&&currentUser.uid)?' (toi)':''}</span>
-        <span class="score">${r.score}</span>
+        <span class="score">${r.score}${suffix ? ' '+suffix : ''}</span>
         ${onRemove ? '<button class="rm-score" type="button" aria-label="Supprimer ce score">✕</button>' : ''}
       `;
       if(onRemove) row.querySelector('.rm-score').addEventListener('click', ()=> onRemove(r.id));
       listEl.appendChild(row);
     });
   }
-
-  // ---------- Modale : ajouter un score Blackjack ----------
-  const overlay = document.getElementById('modal-overlay');
-  const scoreTitle = document.getElementById('score-title');
-  const scoreWho = document.getElementById('score-who');
-  const scoreValue = document.getElementById('score-value');
-
-  function openModal(){ overlay.classList.add('active'); }
-  function closeModal(){ overlay.classList.remove('active'); }
-  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModal(); });
-
-  document.querySelector('.lb-add[data-game="blackjack"]').addEventListener('click', ()=>{
-    if(!currentUser){ alert('Connecte-toi pour noter un score'); return; }
-    scoreTitle.textContent = 'Score — Blackjack';
-    const options = [{ uid: currentUser.uid, name: currentUser.displayName || 'Toi' }, ...myFriends];
-    scoreWho.innerHTML = options.map(o=>`<option value="${o.uid}">${escapeHtml(o.name)}</option>`).join('');
-    scoreValue.value = '';
-    openModal();
-    setTimeout(()=>scoreValue.focus(), 200);
-  });
-  document.getElementById('score-cancel').addEventListener('click', closeModal);
-  document.getElementById('score-confirm').addEventListener('click', ()=>{
-    const val = parseInt(scoreValue.value, 10);
-    if(isNaN(val)) { scoreValue.focus(); return; }
-    const opt = scoreWho.selectedOptions[0];
-    bjScores.push({ id: uid(), uid: opt.value, name: opt.textContent, score: val });
-    saveJSON(BJ_KEY, bjScores);
-    renderBlackjackLeaderboard();
-    closeModal();
-  });
 
   // ---------- Formulaire de connexion / inscription ----------
   let authMode = 'signup';
