@@ -163,6 +163,19 @@
   #back-btn svg{width:15px;height:15px;flex:none;}
   #back-btn:active{transform:scale(0.96);}
 
+  #game-loading{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;background:#000;z-index:1;transition:opacity 0.25s ease;
+  }
+  #game-loading.hidden{opacity:0;pointer-events:none;}
+  .spinner{
+    width:34px;height:34px;border-radius:50%;
+    border:3px solid rgba(255,255,255,0.15);border-top-color:var(--gold);
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #game-loading p{color:var(--dim);font-size:12.5px;letter-spacing:0.3px;margin:0;}
+
   #view-library.hidden{display:none;}
 
   /* ---- Barre d'onglets ---- */
@@ -336,6 +349,8 @@
   .me-pseudo{font-weight:700;font-size:16px;display:block;margin-bottom:4px;}
   .code-hint{font-size:11.5px;color:var(--dim);}
   .code-hint b{color:var(--gold);letter-spacing:1px;}
+  .copy-btn{background:transparent;border:0;color:var(--dim);font-size:12.5px;padding:0 0 0 4px;vertical-align:middle;}
+  .copy-btn:active{transform:scale(0.9);}
 
   .add-friend-row{display:flex;gap:8px;margin-bottom:14px;}
   .add-friend-row input{
@@ -400,7 +415,7 @@
     <header>
       <div class="eyebrow">Le classement</div>
       <h1>MES AMIS</h1>
-      <div class="sub">Le même compte que dans les jeux.</div>
+      <div class="sub" id="friends-sub">Le même compte que dans les jeux.</div>
     </header>
 
     <div class="perf"><span class="dot"></span><span class="rule"></span><span class="dot"></span></div>
@@ -423,7 +438,7 @@
         <div class="avatar-big" id="me-avatar">🙂</div>
         <div class="me-info">
           <b class="me-pseudo" id="me-pseudo">—</b>
-          <div class="code-hint">Code ami : <b id="my-code">—</b></div>
+          <div class="code-hint">Code ami : <b id="my-code">—</b> <button type="button" id="copy-code-btn" class="copy-btn" aria-label="Copier le code">📋</button></div>
           <div class="avatar-row" id="me-avatar-picker"></div>
         </div>
         <button type="button" id="btn-logout">🚪</button>
@@ -464,6 +479,10 @@
     Bibliothèque
   </button>
   <iframe id="game-frame" allow="autoplay; fullscreen" title="Jeu"></iframe>
+  <div id="game-loading">
+    <div class="spinner"></div>
+    <p>Chargement du jeu…</p>
+  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -484,14 +503,19 @@
   const libraryView = document.getElementById('view-library');
   const gameView = document.getElementById('view-game');
   const frame = document.getElementById('game-frame');
+  const gameLoading = document.getElementById('game-loading');
   const backBtn = document.getElementById('back-btn');
   const cards = document.querySelectorAll('.card[data-game]');
 
   function openGame(url, push){
+    gameLoading.classList.remove('hidden');
     frame.src = url;
     gameView.classList.add('active');
     if(push) history.pushState({ arcadeGame:url }, '', '#jeu');
   }
+  frame.addEventListener('load', ()=>{
+    if(frame.src !== 'about:blank') gameLoading.classList.add('hidden');
+  });
   function closeGame(pop){
     gameView.classList.remove('active');
     frame.src = 'about:blank';
@@ -518,6 +542,7 @@
     viewFriends.classList.toggle('hidden', isJeux);
     tabJeux.classList.toggle('active', isJeux);
     tabAmis.classList.toggle('active', !isJeux);
+    if(!isJeux && currentUser){ fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); }
   }
   tabJeux.addEventListener('click', ()=> showTab('jeux'));
   tabAmis.addEventListener('click', ()=> showTab('amis'));
@@ -632,9 +657,9 @@
 
   function addFriendByCode(rawCode){
     const code = (rawCode||'').trim().toUpperCase();
-    if(!code || !fbReady || !currentUser) return;
-    if(code === myFriendCode){ alert("C'est ton propre code !"); return; }
-    fbDb.collection('users').where('code','==',code).limit(1).get().then(snap=>{
+    if(!code || !fbReady || !currentUser) return Promise.resolve();
+    if(code === myFriendCode){ alert("C'est ton propre code !"); return Promise.resolve(); }
+    return fbDb.collection('users').where('code','==',code).limit(1).get().then(snap=>{
       if(snap.empty){ alert('❌ Aucun joueur avec ce code'); return; }
       const doc = snap.docs[0];
       const targetUid = doc.id;
@@ -642,7 +667,7 @@
       if(myFriends.some(f=>f.uid===targetUid)){ alert('Déjà dans tes amis'); return; }
       const myEntry = { uid: targetUid, name: targetName };
       const theirEntry = { uid: currentUser.uid, name: (currentUser.displayName||'Joueur').slice(0,16) };
-      Promise.all([
+      return Promise.all([
         fbDb.collection('users').doc(currentUser.uid).update({ friends: firebase.firestore.FieldValue.arrayUnion(myEntry) }),
         fbDb.collection('users').doc(targetUid).update({ friends: firebase.firestore.FieldValue.arrayUnion(theirEntry) })
       ]).then(()=>{
@@ -664,8 +689,14 @@
   }
 
   const friendChips = document.getElementById('friend-chips');
+  const friendsSubEl = document.getElementById('friends-sub');
   function renderFriends(){
     friendChips.innerHTML = '';
+    if(friendsSubEl){
+      friendsSubEl.textContent = myFriends.length === 0
+        ? 'Le même compte que dans les jeux.'
+        : `${myFriends.length} ami${myFriends.length>1?'s':''} dans ton classement`;
+    }
     if(myFriends.length === 0){
       const hint = document.createElement('div');
       hint.className = 'empty-hint';
@@ -677,15 +708,35 @@
       const chip = document.createElement('div');
       chip.className = 'friend-chip';
       chip.innerHTML = `<span class="fav">${avatarFor(f.uid)}</span>${escapeHtml(f.name)}<button class="rm" type="button" aria-label="Retirer ${escapeHtml(f.name)}">✕</button>`;
-      chip.querySelector('.rm').addEventListener('click', ()=> removeFriend(f.uid));
+      chip.querySelector('.rm').addEventListener('click', ()=>{
+        if(confirm(`Retirer ${f.name} de tes amis ?`)) removeFriend(f.uid);
+      });
       friendChips.appendChild(chip);
     });
   }
 
   document.getElementById('add-friend-btn').addEventListener('click', ()=>{
     const input = document.getElementById('friend-code-input');
-    addFriendByCode(input.value);
+    const btn = document.getElementById('add-friend-btn');
+    if(!input.value.trim()) return;
+    const prevText = btn.textContent;
+    btn.disabled = true; btn.textContent = '…';
+    addFriendByCode(input.value).finally(()=>{ btn.disabled = false; btn.textContent = prevText; });
     input.value = '';
+  });
+  document.getElementById('friend-code-input').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('add-friend-btn').click();
+  });
+
+  document.getElementById('copy-code-btn').addEventListener('click', ()=>{
+    if(!myFriendCode) return;
+    const btn = document.getElementById('copy-code-btn');
+    const feedback = ()=>{ btn.textContent = '✅'; setTimeout(()=> btn.textContent = '📋', 1200); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(myFriendCode).then(feedback).catch(feedback);
+    } else {
+      feedback();
+    }
   });
 
   document.getElementById('btn-logout').addEventListener('click', ()=>{
@@ -784,6 +835,9 @@
   }
   document.getElementById('tab-signup').addEventListener('click', ()=> setAuthTab('signup'));
   document.getElementById('tab-login').addEventListener('click', ()=> setAuthTab('login'));
+  document.getElementById('auth-password').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('btn-auth-submit').click();
+  });
 
   function authErrorMessage(err){
     const c = err && err.code;
