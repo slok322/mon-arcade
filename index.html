@@ -495,6 +495,11 @@
         <div class="lb-head"><span>♠ Blackjack</span><button class="lb-refresh" id="btn-refresh-blackjack" type="button">🔄</button></div>
         <div class="lb-list" id="lb-blackjack"></div>
       </div>
+
+      <div class="lb-block">
+        <div class="lb-head"><span>🃏 Skyjo</span><button class="lb-refresh" id="btn-refresh-skyjo" type="button">🔄</button></div>
+        <div class="lb-list" id="lb-skyjo"></div>
+      </div>
     </div>
 
     <footer>Classements en direct, tirés du même compte que dans les jeux.</footer>
@@ -577,7 +582,7 @@
     viewFriends.classList.toggle('hidden', isJeux);
     tabJeux.classList.toggle('active', isJeux);
     tabAmis.classList.toggle('active', !isJeux);
-    if(!isJeux && currentUser){ fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); }
+    if(!isJeux && currentUser){ fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); fetchSkyjoLeaderboard(); }
   }
   tabJeux.addEventListener('click', ()=> showTab('jeux'));
   tabAmis.addEventListener('click', ()=> showTab('amis'));
@@ -626,7 +631,7 @@
         currentUser = user;
         updateAuthUI();
         if(user){
-          ensureUserDoc().then(()=>{ renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); });
+          ensureUserDoc().then(()=>{ renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); fetchSkyjoLeaderboard(); });
         } else {
           myFriendCode = ''; myFriends = [];
         }
@@ -643,7 +648,7 @@
       meAvatarEl.textContent = avatarFor(currentUser.uid);
       buildAvatarPicker(meAvatarPicker, avatarFor(currentUser.uid), (av)=>{
         avatarMap[currentUser.uid] = av; saveJSON(AV_KEY, avatarMap);
-        meAvatarEl.textContent = av; fetchAscensionLeaderboard(); fetchBlackjackLeaderboard();
+        meAvatarEl.textContent = av; fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); fetchSkyjoLeaderboard();
       });
     } else {
       authCard.classList.remove('hidden');
@@ -707,7 +712,7 @@
         fbDb.collection('users').doc(targetUid).update({ friends: firebase.firestore.FieldValue.arrayUnion(theirEntry) })
       ]).then(()=>{
         myFriends.push(myEntry);
-        renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard();
+        renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); fetchSkyjoLeaderboard();
       }).catch(err=>{ console.warn('Ajout ami impossible', err); alert("❌ Impossible d'ajouter cet ami"); });
     }).catch(err=>{ console.warn('Recherche ami impossible', err); alert('❌ Erreur de recherche'); });
   }
@@ -719,7 +724,7 @@
     fbDb.collection('users').doc(currentUser.uid).update({ friends: firebase.firestore.FieldValue.arrayRemove(entry) })
       .then(()=>{
         myFriends = myFriends.filter(f=>f.uid!==fuid);
-        renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard();
+        renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); fetchSkyjoLeaderboard();
       }).catch(err=>{ console.warn('Suppression ami impossible', err); alert('❌ Impossible de retirer cet ami'); });
   }
 
@@ -832,6 +837,34 @@
       });
   }
   document.getElementById('btn-refresh-blackjack').addEventListener('click', fetchBlackjackLeaderboard);
+
+  // ---------- Classement Skyjo (en direct, tiré des victoires sauvegardées par le jeu) ----------
+  function fetchSkyjoLeaderboard(){
+    const listEl = document.getElementById('lb-skyjo');
+    if(!fbReady || !currentUser) return;
+    listEl.innerHTML = '<div class="empty-hint">Chargement…</div>';
+    const uids = [currentUser.uid, ...myFriends.map(f=>f.uid)];
+    const chunks = [];
+    for(let i=0;i<uids.length;i+=10) chunks.push(uids.slice(i,i+10));
+    Promise.all(chunks.map(chunk=> fbDb.collection('users').where(firebase.firestore.FieldPath.documentId(),'in',chunk).get()))
+      .then(snaps=>{
+        const rows = [];
+        snaps.forEach(snap=> snap.forEach(doc=>{
+          const d = doc.data();
+          const hasWins = d.skyjo && typeof d.skyjo.wins === 'number';
+          if(!hasWins) return;
+          const friend = myFriends.find(f=>f.uid===doc.id);
+          const name = doc.id === currentUser.uid ? (currentUser.displayName || d.pseudo || 'Joueur') : (friend ? friend.name : (d.pseudo || 'Joueur'));
+          rows.push({ who: doc.id, name, score: d.skyjo.wins });
+        }));
+        renderLeaderboardRows(listEl, rows, "Personne n'a encore joué au Skyjo — lancez une partie !", null, '🏆');
+      })
+      .catch(err=>{
+        console.warn('Classement Skyjo indisponible', err);
+        listEl.innerHTML = '<div class="empty-hint">Classement indisponible pour le moment.</div>';
+      });
+  }
+  document.getElementById('btn-refresh-skyjo').addEventListener('click', fetchSkyjoLeaderboard);
 
   function renderLeaderboardRows(listEl, rows, emptyMsg, onRemove, suffix){
     rows = rows.slice().sort((a,b)=>b.score-a.score);
