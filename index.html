@@ -140,6 +140,20 @@
     font-family:Georgia,serif;line-height:1;
   }
 
+  /* ---- Duel Éclair card art ---- */
+  .art-duel{
+    background:linear-gradient(165deg,#1c2140 0%, #0a0c16 75%);
+  }
+  .art-duel::before{
+    content:"⚡";position:absolute;right:6px;bottom:-26px;font-size:130px;line-height:1;
+    color:rgba(124,245,255,0.10);
+  }
+  .art-duel::after{
+    content:"";position:absolute;right:26px;top:18px;width:30px;height:30px;border-radius:50%;
+    background:radial-gradient(circle at 35% 35%, #d8f9ff, #7cf5ff 55%, transparent 72%);
+    box-shadow:0 0 24px rgba(124,245,255,0.5);
+  }
+
   /* ---- Skyjo card art ---- */
   .art-skyjo{
     background:linear-gradient(165deg,#17223d 0%, #0a0f1c 75%);
@@ -409,7 +423,7 @@
   <header>
     <div class="eyebrow">Ta sélection</div>
     <h1>MON ARCADE</h1>
-    <div class="sub">Trois jeux, une seule adresse.</div>
+    <div class="sub">Quatre jeux, une seule adresse.</div>
   </header>
 
   <div class="perf"><span class="dot"></span><span class="rule"></span><span class="dot"></span></div>
@@ -445,6 +459,18 @@
         <span class="tag">🃏 Cartes · Duel</span>
         <h2>SKYJO</h2>
         <p>Affronte l'ordinateur et essaie d'avoir le score le plus bas possible.</p>
+        <span class="play">Jouer
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </span>
+      </div>
+    </a>
+
+    <a class="card" href="https://slok322.github.io/eclair/#jeu" data-game="duel-eclair">
+      <div class="card-art art-duel"></div>
+      <div class="card-inner">
+        <span class="tag">⚡ Duel · Réflexes</span>
+        <h2>DUEL ÉCLAIR</h2>
+        <p>Mémorise, retape, le plus rapide gagne. Affronte un bot ou un ami en 1v1.</p>
         <span class="play">Jouer
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </span>
