@@ -12,6 +12,7 @@
     --ink:#eef0fb;--dim:#7c84a8;--gold:#e8c874;--green:#4fd1a5;--red:#ff6b6b;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  .hidden{display:none !important;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
     font-family:'Space Grotesk',-apple-system,sans-serif;min-height:100%;}
   body{background:radial-gradient(60% 40% at 15% -10%, rgba(255,107,74,0.10), transparent 60%),
@@ -101,7 +102,7 @@
   };
 
   // ⚠️ REMPLACE cette valeur par TON UID Firebase (Console Firebase > Authentication > ton compte > "User UID").
-  const ADMIN_UID = "REMPLACE_PAR_TON_UID";
+  const ADMIN_UID = "MH2ThUS03xfKcHTwop0B4qKCgk43";
 
   firebase.initializeApp(FIREBASE_CONFIG);
   const fbAuth = firebase.auth();
