@@ -667,8 +667,10 @@
         updateAuthUI();
         if(user){
           ensureUserDoc().then(()=>{ renderFriends(); fetchAscensionLeaderboard(); fetchBlackjackLeaderboard(); fetchSkyjoLeaderboard(); });
+          startPresence();
         } else {
           myFriendCode = ''; myFriends = [];
+          stopPresence();
         }
       });
     }
@@ -817,6 +819,40 @@
   document.getElementById('btn-logout').addEventListener('click', ()=>{
     if(fbAuth) fbAuth.signOut();
   });
+
+  // ---------- Présence en ligne (pour le panneau admin) ----------
+  let presenceInterval = null;
+  function startPresence(){
+    if(!fbReady || !currentUser) return;
+    updatePresence();
+    if(presenceInterval) clearInterval(presenceInterval);
+    presenceInterval = setInterval(updatePresence, 20000);
+    document.addEventListener('visibilitychange', onPresenceVisibilityChange);
+    window.addEventListener('beforeunload', markOffline);
+  }
+  function onPresenceVisibilityChange(){
+    if(document.visibilityState === 'visible') updatePresence();
+  }
+  function updatePresence(){
+    if(!fbReady || !currentUser || document.visibilityState === 'hidden') return;
+    fbDb.collection('presence').doc(currentUser.uid).set({
+      uid: currentUser.uid,
+      pseudo: (currentUser.displayName || 'Joueur').slice(0,16),
+      avatar: avatarFor(currentUser.uid),
+      lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true}).catch(err=> console.warn('Présence indisponible', err));
+  }
+  function stopPresence(){
+    if(presenceInterval) clearInterval(presenceInterval);
+    presenceInterval = null;
+    document.removeEventListener('visibilitychange', onPresenceVisibilityChange);
+    markOffline();
+  }
+  function markOffline(){
+    if(fbReady && currentUser){
+      fbDb.collection('presence').doc(currentUser.uid).delete().catch(()=>{});
+    }
+  }
 
   // ---------- Classement Ascension (en direct, tiré du même Firestore que le jeu) ----------
   function fetchAscensionLeaderboard(){
