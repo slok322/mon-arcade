@@ -36,9 +36,17 @@
   .row{display:flex;align-items:center;gap:10px;padding:9px 11px;background:rgba(255,255,255,0.04);
     border-radius:12px;border:1px solid var(--line);}
   .row .av{font-size:19px;}
-  .row .name{font-weight:600;font-size:13.5px;flex:1;}
+  .row .name{font-weight:600;font-size:13.5px;flex:1;line-height:1.5;}
   .row .ago{font-size:11px;color:var(--dim);}
+  .row .badge{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dim);}
+  .row .badge.on{background:var(--green);box-shadow:0 0 6px var(--green);}
+  .row .mini{font-size:11px;color:var(--dim);white-space:nowrap;}
   .empty{color:var(--dim);font-size:13px;padding:8px 2px;}
+  .loading{color:var(--dim);font-size:13px;padding:8px 2px;}
+  .search{width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--line);border-radius:12px;
+    color:var(--ink);font-size:13.5px;padding:10px 13px;font-family:inherit;margin-bottom:10px;}
+  .search:focus{outline:0;border-color:var(--gold);}
+  .count-tag{color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;}
   .refresh{background:rgba(255,255,255,0.08);border:1px solid var(--line);color:var(--ink);
     font-size:12.5px;padding:7px 13px;border-radius:999px;float:right;margin-top:-42px;}
   .gate{max-width:340px;margin:80px auto;text-align:center;}
@@ -82,6 +90,12 @@
         <div class="stat"><div class="n" id="stat-skyjo">—</div><div class="l">Victoires Skyjo (total)</div></div>
         <div class="stat"><div class="n" id="stat-ascension">—</div><div class="l">Meilleure altitude</div></div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Tous les comptes <span class="count-tag" id="accounts-count"></span> <button class="refresh" id="btn-refresh-accounts" type="button">🔄</button></h2>
+      <input class="search" id="accounts-search" type="text" placeholder="Rechercher un pseudo ou un code…">
+      <div class="list" id="accounts-list"></div>
     </div>
 
   </div>
@@ -136,17 +150,31 @@
     gate.classList.add('hidden'); denied.classList.add('hidden'); dash.classList.remove('hidden');
     watchOnline();
     loadStats();
+    setInterval(loadStats, 60000); // rafraîchit les stats & la liste des comptes toutes les 60s
   });
 
   const ONLINE_WINDOW_MS = 45000; // considéré en ligne si vu il y a moins de 45s
   let lastSnapshotDocs = [];
+  let allAccounts = [];
+  let accountsLoaded = false;
+
+  function onlineUidSet(){
+    const now = Date.now();
+    const set = new Set();
+    lastSnapshotDocs.forEach(doc=>{
+      const d = doc.data();
+      if(d.lastSeen && (now - d.lastSeen.toMillis()) < ONLINE_WINDOW_MS) set.add(d.uid);
+    });
+    return set;
+  }
 
   function watchOnline(){
     presenceUnsub = fbDb.collection('presence').onSnapshot(snap=>{
       lastSnapshotDocs = snap.docs;
       renderOnline();
+      if(accountsLoaded) renderAccounts();
     }, err=> console.warn('Lecture présence impossible', err));
-    setInterval(renderOnline, 10000); // rafraîchit l'affichage même sans nouvel événement
+    setInterval(()=>{ renderOnline(); if(accountsLoaded) renderAccounts(); }, 10000);
   }
 
   function renderOnline(){
@@ -173,19 +201,35 @@
   }
 
   function loadStats(){
+    document.getElementById('accounts-list').innerHTML = accountsLoaded ? document.getElementById('accounts-list').innerHTML : '<div class="loading">Chargement…</div>';
+
     fbDb.collection('users').get().then(snap=>{
       document.getElementById('stat-users').textContent = snap.size;
       let bjTotal = 0, skyjoTotal = 0;
+      const accounts = [];
       snap.forEach(doc=>{
         const d = doc.data();
-        if(d.blackjack && typeof d.blackjack.bank === 'number') bjTotal += d.blackjack.bank;
-        if(d.skyjo && typeof d.skyjo.wins === 'number') skyjoTotal += d.skyjo.wins;
+        const bank = (d.blackjack && typeof d.blackjack.bank === 'number') ? d.blackjack.bank : null;
+        const wins = (d.skyjo && typeof d.skyjo.wins === 'number') ? d.skyjo.wins : null;
+        if(bank !== null) bjTotal += bank;
+        if(wins !== null) skyjoTotal += wins;
+        accounts.push({
+          uid: doc.id,
+          pseudo: d.pseudo || 'Joueur',
+          code: d.code || '—',
+          friends: Array.isArray(d.friends) ? d.friends.length : 0,
+          bank, wins
+        });
       });
       document.getElementById('stat-bj').textContent = bjTotal.toLocaleString('fr-FR');
       document.getElementById('stat-skyjo').textContent = skyjoTotal;
+      allAccounts = accounts;
+      accountsLoaded = true;
+      renderAccounts();
     }).catch(err=>{
       console.warn('Stats comptes indisponibles', err);
       document.getElementById('stat-users').textContent = '?';
+      document.getElementById('accounts-list').innerHTML = '<div class="empty">Impossible de charger les comptes.</div>';
     });
 
     fbDb.collection('scores').get().then(snap=>{
@@ -198,7 +242,44 @@
     });
   }
 
+  function renderAccounts(){
+    const online = onlineUidSet();
+    const query = document.getElementById('accounts-search').value.trim().toLowerCase();
+
+    let accounts = allAccounts.filter(a=>
+      !query || a.pseudo.toLowerCase().includes(query) || a.code.toLowerCase().includes(query)
+    );
+
+    accounts.sort((a,b)=>{
+      const aOn = online.has(a.uid), bOn = online.has(b.uid);
+      if(aOn !== bOn) return aOn ? -1 : 1;
+      return a.pseudo.localeCompare(b.pseudo, 'fr', {sensitivity:'base'});
+    });
+
+    document.getElementById('accounts-count').textContent = `${accounts.length}/${allAccounts.length}`;
+
+    const listEl = document.getElementById('accounts-list');
+    listEl.innerHTML = '';
+    if(accounts.length === 0){
+      listEl.innerHTML = `<div class="empty">${allAccounts.length===0 ? 'Aucun compte pour le moment.' : 'Aucun résultat.'}</div>`;
+      return;
+    }
+    accounts.forEach(a=>{
+      const isOn = online.has(a.uid);
+      const bits = [];
+      if(a.bank !== null) bits.push(`🪙 ${a.bank}`);
+      if(a.wins !== null) bits.push(`🏆 ${a.wins}`);
+      bits.push(`${a.friends} ami${a.friends>1?'s':''}`);
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<span class="badge${isOn?' on':''}" title="${isOn?'En ligne':'Hors ligne'}"></span><span class="name">${escapeHtml(a.pseudo)}<br><span class="ago">${escapeHtml(a.code)}</span></span><span class="mini">${escapeHtml(bits.join(' · '))}</span>`;
+      listEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('btn-refresh-accounts').addEventListener('click', loadStats);
   document.getElementById('btn-refresh-stats').addEventListener('click', loadStats);
+  document.getElementById('accounts-search').addEventListener('input', ()=>{ if(accountsLoaded) renderAccounts(); });
 
   function escapeHtml(str){
     return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
