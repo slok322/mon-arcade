@@ -177,6 +177,21 @@
     transform:rotate(-9deg);box-shadow:0 10px 18px rgba(0,0,0,0.3);
   }
 
+  /* ---- Loup-Garou card art ---- */
+  .art-loupgarou{
+    background:radial-gradient(120% 70% at 50% -10%, rgba(90,100,180,0.20), transparent 60%),
+      linear-gradient(180deg,#141b3a 0%, #0a0e1e 80%);
+  }
+  .art-loupgarou::before{
+    content:"🐺";position:absolute;right:2px;bottom:-24px;font-size:112px;line-height:1;
+    opacity:0.14;filter:grayscale(1);
+  }
+  .art-loupgarou::after{
+    content:"";position:absolute;right:20px;top:16px;width:32px;height:32px;border-radius:50%;
+    background:radial-gradient(circle at 35% 35%, #ffffff, #c7cdf0 55%, transparent 72%);
+    box-shadow:0 0 22px rgba(199,205,240,0.55);
+  }
+
   footer{margin-top:30px;text-align:center;color:var(--dim);font-size:11.5px;letter-spacing:0.5px;}
 
   @media (prefers-reduced-motion:no-preference){
@@ -423,7 +438,7 @@
   <header>
     <div class="eyebrow">Ta sélection</div>
     <h1>MON ARCADE</h1>
-    <div class="sub">Quatre jeux, une seule adresse.</div>
+    <div class="sub">Cinq jeux, une seule adresse.</div>
   </header>
 
   <div class="perf"><span class="dot"></span><span class="rule"></span><span class="dot"></span></div>
@@ -471,6 +486,18 @@
         <span class="tag">⚡ Duel · Réflexes</span>
         <h2>DUEL ÉCLAIR</h2>
         <p>Mémorise, retape, le plus rapide gagne. Affronte un bot ou un ami en 1v1.</p>
+        <span class="play">Jouer
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </span>
+      </div>
+    </a>
+
+    <a class="card" href="https://slok322.github.io/loup-garou/#jeu" data-game="loup-garou">
+      <div class="card-art art-loupgarou"></div>
+      <div class="card-inner">
+        <span class="tag">🌙 Nuit · Village</span>
+        <h2>LOUP-GAROU</h2>
+        <p>Un rôle secret, un village à sauver ou à dévorer. Joue contre des bots, ou entre amis en ligne.</p>
         <span class="play">Jouer
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </span>
