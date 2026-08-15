@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Admin · Mon Arcade</title>
+<meta name="theme-color" content="#080b14">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080b14;--panel:#11162a;--line:rgba(255,255,255,0.09);
+    --ink:#eef0fb;--dim:#7c84a8;--gold:#e8c874;--green:#4fd1a5;--red:#ff6b6b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:'Space Grotesk',-apple-system,sans-serif;min-height:100%;}
+  body{background:radial-gradient(60% 40% at 15% -10%, rgba(255,107,74,0.10), transparent 60%),
+    radial-gradient(50% 35% at 100% 0%, rgba(29,92,70,0.18), transparent 60%), var(--bg);}
+  #app{max-width:560px;margin:0 auto;padding:28px 18px 60px;}
+  h1{font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:1.5px;margin:0 0 4px;
+    background:linear-gradient(90deg,#fff 10%, var(--gold) 60%);-webkit-background-clip:text;
+    background-clip:text;color:transparent;}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:26px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;margin-bottom:16px;}
+  .card h2{font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin:0 0 12px;font-weight:700;}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:44px;line-height:1;display:flex;align-items:baseline;gap:10px;}
+  .big .dot{width:11px;height:11px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);
+    display:inline-block;animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+  .stat-row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .stat{flex:1;min-width:120px;}
+  .stat .n{font-family:'Bebas Neue',sans-serif;font-size:28px;}
+  .stat .l{font-size:11px;color:var(--dim);letter-spacing:0.4px;text-transform:uppercase;}
+  .list{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+  .row{display:flex;align-items:center;gap:10px;padding:9px 11px;background:rgba(255,255,255,0.04);
+    border-radius:12px;border:1px solid var(--line);}
+  .row .av{font-size:19px;}
+  .row .name{font-weight:600;font-size:13.5px;flex:1;}
+  .row .ago{font-size:11px;color:var(--dim);}
+  .empty{color:var(--dim);font-size:13px;padding:8px 2px;}
+  .refresh{background:rgba(255,255,255,0.08);border:1px solid var(--line);color:var(--ink);
+    font-size:12.5px;padding:7px 13px;border-radius:999px;float:right;margin-top:-42px;}
+  .gate{max-width:340px;margin:80px auto;text-align:center;}
+  .gate input{width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--line);border-radius:12px;
+    color:var(--ink);font-size:14px;padding:12px;margin:8px 0;font-family:inherit;}
+  .gate button{width:100%;padding:12px;border-radius:12px;border:0;background:var(--gold);color:#1a1406;
+    font-weight:700;font-size:14px;margin-top:6px;}
+  .err{color:var(--red);font-size:12.5px;min-height:16px;margin-top:6px;}
+  .denied{color:var(--red);text-align:center;margin-top:100px;font-size:14px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="gate" id="gate">
+    <h1>ADMIN</h1>
+    <div class="sub">Connecte-toi avec ton compte admin</div>
+    <input id="g-email" type="email" placeholder="E-mail" autocomplete="username">
+    <input id="g-pass" type="password" placeholder="Mot de passe" autocomplete="current-password">
+    <button id="g-btn" type="button">Se connecter</button>
+    <div class="err" id="g-err"></div>
+  </div>
+
+  <div id="denied" class="denied hidden">⛔ Ce compte n'est pas autorisé à voir cette page.</div>
+
+  <div id="dash" class="hidden">
+    <h1>PANNEAU ADMIN</h1>
+    <div class="sub">Mon Arcade · vue en temps réel</div>
+
+    <div class="card">
+      <h2>En ligne maintenant</h2>
+      <div class="big"><span class="dot"></span><span id="online-count">0</span></div>
+      <div class="list" id="online-list" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Comptes &amp; activité <button class="refresh" id="btn-refresh-stats" type="button">🔄</button></h2>
+      <div class="stat-row">
+        <div class="stat"><div class="n" id="stat-users">—</div><div class="l">Comptes créés</div></div>
+        <div class="stat"><div class="n" id="stat-bj">—</div><div class="l">Jetons Blackjack (total)</div></div>
+        <div class="stat"><div class="n" id="stat-skyjo">—</div><div class="l">Victoires Skyjo (total)</div></div>
+        <div class="stat"><div class="n" id="stat-ascension">—</div><div class="l">Meilleure altitude</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  // Même projet Firebase que le reste de l'arcade.
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBk6XKD0_nuGXO5EtuGqe9LiOVEgNEtC8g",
+    authDomain: "ascension-game-370c0.firebaseapp.com",
+    projectId: "ascension-game-370c0",
+    storageBucket: "ascension-game-370c0.firebasestorage.app",
+    messagingSenderId: "57942969538",
+    appId: "1:57942969538:web:450cb74c51f985e9c5bf5b"
+  };
+
+  // ⚠️ REMPLACE cette valeur par TON UID Firebase (Console Firebase > Authentication > ton compte > "User UID").
+  const ADMIN_UID = "REMPLACE_PAR_TON_UID";
+
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const fbAuth = firebase.auth();
+  const fbDb = firebase.firestore();
+
+  const gate = document.getElementById('gate');
+  const denied = document.getElementById('denied');
+  const dash = document.getElementById('dash');
+
+  document.getElementById('g-btn').addEventListener('click', ()=>{
+    const email = document.getElementById('g-email').value.trim();
+    const pass = document.getElementById('g-pass').value;
+    const err = document.getElementById('g-err');
+    err.textContent = '';
+    if(!email || !pass){ err.textContent = "Remplis l'e-mail et le mot de passe."; return; }
+    fbAuth.signInWithEmailAndPassword(email, pass).catch(e=>{ err.textContent = "Connexion impossible."; });
+  });
+
+  let presenceUnsub = null;
+
+  fbAuth.onAuthStateChanged(user=>{
+    if(presenceUnsub){ presenceUnsub(); presenceUnsub = null; }
+    if(!user){
+      gate.classList.remove('hidden'); denied.classList.add('hidden'); dash.classList.add('hidden');
+      return;
+    }
+    if(user.uid !== ADMIN_UID){
+      gate.classList.add('hidden'); dash.classList.add('hidden'); denied.classList.remove('hidden');
+      return;
+    }
+    gate.classList.add('hidden'); denied.classList.add('hidden'); dash.classList.remove('hidden');
+    watchOnline();
+    loadStats();
+  });
+
+  const ONLINE_WINDOW_MS = 45000; // considéré en ligne si vu il y a moins de 45s
+  let lastSnapshotDocs = [];
+
+  function watchOnline(){
+    presenceUnsub = fbDb.collection('presence').onSnapshot(snap=>{
+      lastSnapshotDocs = snap.docs;
+      renderOnline();
+    }, err=> console.warn('Lecture présence impossible', err));
+    setInterval(renderOnline, 10000); // rafraîchit l'affichage même sans nouvel événement
+  }
+
+  function renderOnline(){
+    const now = Date.now();
+    const online = lastSnapshotDocs
+      .map(d=> d.data())
+      .filter(d=> d.lastSeen && (now - d.lastSeen.toMillis()) < ONLINE_WINDOW_MS)
+      .sort((a,b)=> b.lastSeen.toMillis() - a.lastSeen.toMillis());
+
+    document.getElementById('online-count').textContent = online.length;
+    const listEl = document.getElementById('online-list');
+    listEl.innerHTML = '';
+    if(online.length === 0){
+      listEl.innerHTML = '<div class="empty">Personne en ligne pour le moment.</div>';
+      return;
+    }
+    online.forEach(d=>{
+      const secs = Math.max(0, Math.round((now - d.lastSeen.toMillis())/1000));
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<span class="av">${d.avatar||'🙂'}</span><span class="name">${escapeHtml(d.pseudo||'Joueur')}</span><span class="ago">il y a ${secs}s</span>`;
+      listEl.appendChild(row);
+    });
+  }
+
+  function loadStats(){
+    fbDb.collection('users').get().then(snap=>{
+      document.getElementById('stat-users').textContent = snap.size;
+      let bjTotal = 0, skyjoTotal = 0;
+      snap.forEach(doc=>{
+        const d = doc.data();
+        if(d.blackjack && typeof d.blackjack.bank === 'number') bjTotal += d.blackjack.bank;
+        if(d.skyjo && typeof d.skyjo.wins === 'number') skyjoTotal += d.skyjo.wins;
+      });
+      document.getElementById('stat-bj').textContent = bjTotal.toLocaleString('fr-FR');
+      document.getElementById('stat-skyjo').textContent = skyjoTotal;
+    }).catch(err=>{
+      console.warn('Stats comptes indisponibles', err);
+      document.getElementById('stat-users').textContent = '?';
+    });
+
+    fbDb.collection('scores').get().then(snap=>{
+      let best = 0;
+      snap.forEach(doc=>{ const a = doc.data().altitude; if(typeof a === 'number' && a > best) best = a; });
+      document.getElementById('stat-ascension').textContent = best;
+    }).catch(err=>{
+      console.warn('Stats Ascension indisponibles', err);
+      document.getElementById('stat-ascension').textContent = '?';
+    });
+  }
+
+  document.getElementById('btn-refresh-stats').addEventListener('click', loadStats);
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+</script>
+</body>
+</html>
